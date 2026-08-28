@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeLocker - Quản Lý Giờ Chơi Game</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary: #3b82f6;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --text: #f8fafc;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        h2 { text-align: center; margin-bottom: 20px; }
+
+        .card {
+            background: rgba(255,255,255,0.05);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        label { display: block; font-size: 14px; margin-bottom: 6px; color: #94a3b8; }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: #fff;
+            box-sizing: border-box;
+            margin-bottom: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-danger { background: var(--danger); color: white; margin-top: 8px; }
+        
+        .timer-display {
+            font-size: 42px;
+            font-weight: bold;
+            text-align: center;
+            margin: 16px 0;
+            color: var(--success);
+            font-family: monospace;
+        }
+
+        .status-badge {
+            text-align: center;
+            font-size: 14px;
+            padding: 6px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+        }
+        .status-locked { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .status-unlocked { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🎮 TimeLocker</h2>
+
+    <!-- Khu vực trạng thái -->
+    <div class="card">
+        <div id="statusBadge" class="status-badge status-locked">🔒 Trạng thái: Khóa chơi game</div>
+        <div class="timer-display" id="timeRemaining">00:00:00</div>
+    </div>
+
+    <!-- Khu vực Admin (Cấp quyền) -->
+    <div class="card" id="adminPanel">
+        <h3>🔑 Cấp Quền Chơi Game (Admin)</h3>
+        <label for="pinCode">Mã PIN Admin (Mặc định: 1234):</label>
+        <input type="password" id="pinInput" placeholder="Nhập PIN">
+
+        <label for="minutesSelect">Thời gian cấp phép:</label>
+        <select id="minutesSelect">
+            <option value="15">15 phút</option>
+            <option value="30">30 phút</option>
+            <option value="60">1 tiếng</option>
+            <option value="120">2 tiếng</option>
+        </select>
+
+        <button class="btn-primary" onclick="grantTime()">Cấp quyền chơi</button>
+        <button class="btn-danger" onclick="lockNow()">Khóa ngay lập tức</button>
+    </div>
+</div>
+
+<script>
+    // Mã PIN Admin mặc định
+    let ADMIN_PIN = "1234";
+    let countdownInterval = null;
+
+    // Khởi tạo app
+    window.onload = function() {
+        checkLockState();
+        setInterval(checkLockState, 1000);
+    };
+
+    function grantTime() {
+        const inputPin = document.getElementById('pinInput').value;
+        const minutes = parseInt(document.getElementById('minutesSelect').value);
+
+        if (inputPin !== ADMIN_PIN) {
+            alert("❌ Sai mã PIN Admin!");
+            return;
+        }
+
+        const now = new Date().getTime();
+        const unlockUntil = now + (minutes * 60 * 1000);
+
+        localStorage.setItem('unlockUntil', unlockUntil);
+        document.getElementById('pinInput').value = '';
+        alert(`✅ Đã cấp quyền chơi game trong ${minutes} phút!`);
+        checkLockState();
+    }
+
+    function lockNow() {
+        const inputPin = document.getElementById('pinInput').value;
+        if (inputPin !== ADMIN_PIN) {
+            alert("❌ Sai mã PIN Admin!");
+            return;
+        }
+        localStorage.removeItem('unlockUntil');
+        checkLockState();
+    }
+
+    function checkLockState() {
+        const unlockUntil = localStorage.getItem('unlockUntil');
+        const now = new Date().getTime();
+        const statusBadge = document.getElementById('statusBadge');
+        const timerDisplay = document.getElementById('timeRemaining');
+
+        if (unlockUntil && now < parseInt(unlockUntil)) {
+            const diff = parseInt(unlockUntil) - now;
+            
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+            timerDisplay.innerText = 
+                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            
+            statusBadge.className = "status-badge status-unlocked";
+            statusBadge.innerText = "🔓 Trạng thái: ĐÃ CẤP QUYỀN CHƠI";
+        } else {
+            timerDisplay.innerText = "00:00:00";
+            statusBadge.className = "status-badge status-locked";
+            statusBadge.innerText = "🔒 Trạng thái: HẾT GIỜ / BỊ KHÓA";
+        }
+    }
+</script>
+
+</body>
+</html>
